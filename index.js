@@ -4,8 +4,7 @@ const mongoose = require("mongoose");
 const cron = require("node-cron");
 const moment = require("moment-timezone");
 
-const usersWhoChatted = new Set(); // #본캐부캐-정보 채팅 친 인원 트래킹
-const messagesByUser = {}; // Stores messages by user in #본캐부캐-정보
+const usersWhoChatted = new Set(); // Track users who have chatted in #본캐부캐-정보
 
 // Create a new client instance
 const client = new Client({
@@ -31,7 +30,7 @@ client.commands.set('부검', require('./Commands/whoHasntChatted.js'));
     });
     console.log("Connected to MongoDB");
 
-    // 디스코드 로그인 토큰 필요
+    // Login to Discord using your bot's token
     client.login(process.env.TOKEN);
 
   } catch (error) {
@@ -39,7 +38,7 @@ client.commands.set('부검', require('./Commands/whoHasntChatted.js'));
   }
 })();
 
-// 명령어
+// Command registration
 client.once("ready", async () => {
   console.log(`${client.user.tag} is online and commands have been registered.`);
 
@@ -47,40 +46,44 @@ client.once("ready", async () => {
     {
       name: '부검',
       description: '부검:#본캐부캐-정보 에 입력하지 않은 인원 찾아내기',
+      type: 1, // Slash Command
     },
     {
       name: 'resetchattracking',
       description: '부검을 위한 #본캐부캐-정보 에 남은 정보를 리셋함',
+      type: 1, // Slash Command
     },
     {
       name: 'checkchatted',
       description: '채팅 친 유저의 이름 목록 확인',
+      type: 1, // Slash Command
     },
     {
       name: 'checkmessage',
       description: '특정 유저가 보낸 메시지 확인',
       options: [
         {
+          type: 3, // STRING
           name: 'userid',
-          type: 'STRING',
           description: '메시지를 확인할 유저의 ID',
           required: true,
         },
       ],
+      type: 1, // Slash Command
     },
   ]);
 
-  // 목요일 오전 9시 타임존
+  // Scheduled task: Thursday at 9:00 AM Korea Time
   cron.schedule('0 9 * * 4', async () => {
     try {
-      console.log("Cron job triggered at 9:00 Korea time");
-      const guild = client.guilds.cache.first(); // 길드 전용봇 다른곳에서 쓸 경우 수정
+      console.log("Scheduled task triggered.");
+      const guild = client.guilds.cache.first(); // Adjust if the bot is in multiple servers
       if (!guild) {
         console.error('Guild not found.');
         return;
       }
 
-      const targetChannel = guild.channels.cache.get('1230710960465907734'); // 완장관리탭 ID
+      const targetChannel = guild.channels.cache.get('1230710960465907734'); // Replace with the ID of #완장관리탭
       const role = guild.roles.cache.find(r => r.name === '파란 지우개');
 
       if (!targetChannel) {
@@ -93,58 +96,51 @@ client.once("ready", async () => {
         return;
       }
 
-      // 목요일 춘식이 알림
+      // Send message
       await targetChannel.send(`${role} 수로 안친 길드원들 역할 조정 부탁드립니다.`);
       console.log('Scheduled message sent to #완장관리탭 for role @파란 지우개.');
     } catch (error) {
       console.error('Error during scheduled task:', error);
     }
   }, {
-    timezone: 'Asia/Seoul' // 한국 타임존
+    timezone: 'Asia/Seoul', // Korean time zone
   });
 });
 
-// #본캐부캐-정보 트래킹
+// Track messages in #본캐부캐-정보
 client.on('messageCreate', async (message) => {
-  const targetChannelId = '1233275024811622431'; // #본캐부캐-정보 채널 ID
+  const targetChannelId = '1233275024811622431'; // Replace with the ID of #본캐부캐-정보
   console.log(`Received message from ${message.author.tag} in channel ${message.channel.id}`);
   if (message.channel.id === targetChannelId && !message.author.bot) {
     if (message.content.trim()) {
-      usersWhoChatted.add(message.author.id); // Add user to the set
-      if (!messagesByUser[message.author.id]) {
-        messagesByUser[message.author.id] = [];
+      if (!usersWhoChatted.has(message.author.id)) {
+        usersWhoChatted.add(message.author.id);
+        console.log(`${message.author.tag} has been added to the set of users who have chatted.`);
       }
-      messagesByUser[message.author.id].push(message.content.trim()); // Store message
-      console.log(`${message.author.tag} sent a message: "${message.content.trim()}"`);
     }
   }
 });
 
-// 명령어 핸들러
+// Command handler
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
+
   try {
     const command = client.commands.get(interaction.commandName);
     if (interaction.commandName === 'resetchattracking') {
       usersWhoChatted.clear();
-      for (const key in messagesByUser) {
-        delete messagesByUser[key];
-      }
       await interaction.reply('The chat tracking for #본캐부캐-정보 has been reset.');
     } else if (interaction.commandName === 'checkchatted') {
-      const userNames = Array.from(usersWhoChatted).map(userId => {
-        const user = interaction.guild.members.cache.get(userId);
-        return user ? user.user.tag : `Unknown User (${userId})`;
-      });
-      await interaction.reply(`Users who chatted in #본캐부캐-정보:\n${userNames.join("\n")}`);
+      // List users who chatted
+      const userList = Array.from(usersWhoChatted)
+        .map(userId => `<@${userId}>`)
+        .join('\n');
+      await interaction.reply(userList || 'No users have chatted yet.');
     } else if (interaction.commandName === 'checkmessage') {
+      // Find messages from a specific user
       const userId = interaction.options.getString('userid');
-      if (!messagesByUser[userId]) {
-        await interaction.reply(`No messages found for user ID ${userId}.`);
-        return;
-      }
-      const messages = messagesByUser[userId].join("\n");
-      await interaction.reply(`Messages from user ID ${userId}:\n${messages}`);
+      const messages = usersWhoChatted[userId];
+      await interaction.reply(messages ? `Messages from <@${userId}>:\n${messages.join('\n')}` : `No messages found for <@${userId}>.`);
     } else if (command) {
       await interaction.deferReply();
       await command.run({ client, interaction, usersWhoChatted });
@@ -155,9 +151,9 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// 환영인사 핸들러
+// Welcome message
 client.on("guildMemberAdd", async (member) => {
-  const targetChannelId = '1229948971406069772'; //#일반채팅 ID
+  const targetChannelId = '1229948971406069772'; // Replace with the ID of #일반채팅
   const welcomeChannel = member.guild.channels.cache.get(targetChannelId);
   if (welcomeChannel) {
     const welcomeMessage = `
@@ -177,7 +173,7 @@ client.on("guildMemberAdd", async (member) => {
   }
 });
 
-// 퇴장/강퇴인원 문구
+// Farewell message
 client.on("guildMemberRemove", (member) => {
   const channel = member.guild.channels.cache.find(ch => ch.name === '생사부');
   if (!channel) return console.error('Channel not found');
