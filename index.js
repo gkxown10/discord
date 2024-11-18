@@ -152,14 +152,14 @@ client.on("interactionCreate", async (interaction) => {
     const { commandName, options } = interaction;
 
     if (commandName === "리셋트래킹") {
-      usersWhoChatted.clear();
-      await interaction.reply("채팅 트래킹리셋");
+      await loadPreviousMessages(); // Reload previous messages
+      await interaction.reply("채팅 트래킹을 리셋하고 이전 메시지를 다시 로드했습니다.");
     } else if (commandName === "채팅친인원") {
       await interaction.deferReply({ ephemeral: true }); // Acknowledge the interaction
       const userIds = Array.from(usersWhoChatted.keys());
 
       if (userIds.length === 0) {
-        await interaction.editReply("에러");
+        await interaction.editReply("채팅 친 유저가 없습니다.");
         return;
       }
 
