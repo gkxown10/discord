@@ -39,19 +39,22 @@ client.commands.set('부검', require('./Commands/whoHasntChatted.js'));
 })();
 
 // 명령어
-client.once("ready", async () => {
-  console.log(`${client.user.tag} is online and commands have been registered.`);
+client.on("interactionCreate", async (interaction) =>{
+  if (!interaction.isCommand()) return;
 
-  await client.application.commands.set([
-    {
-      name: '부검',
-      description: '부검:#본캐부캐-정보 에 입력하지 않은 인원 찾아내기',
-    },
-    {
-      name: 'resetchattracking',
-      description: '부검을 위한 #본캐부캐-정보 에 남은 정보를 리셋함',
-    },
-  ]);
+  try {
+    const command = client.commands.get(interaction.commandName);
+
+    if (command) {
+      await command.run({client, interaction, usersWhoChatted});
+  
+    }
+  } catch (error){
+    console.error("Error handling interaction: ", error);
+    await interaction.reply({ content: "오류", ephemeral: true});
+  }
+}
+);
 
   // 목요일 오전 9시 타임존
   cron.schedule('0 9 * * 4', async () => {
