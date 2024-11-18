@@ -203,14 +203,14 @@ client.on("interactionCreate", async (interaction) => {
       const member = guild.members.cache.find((m) => m.user.tag === userName);
 
       if (!member) {
-        await interaction.editReply(`No user found with the username: ${userName}`);
+        await interaction.editReply(`${userName}의 채팅을 찾지 못했습니다.`);
         return;
       }
 
       const messageContent = usersWhoChatted.get(member.user.id);
 
       if (!messageContent) {
-        await interaction.editReply(`No message found for user: ${userName}`);
+        await interaction.editReply(`${userName}의 채팅을 찾지 못했습니다.`);
         return;
       }
 
