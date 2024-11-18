@@ -4,7 +4,8 @@ const mongoose = require("mongoose");
 const cron = require("node-cron");
 const moment = require("moment-timezone");
 
-const usersWhoChatted = new Set(); //  #본캐부캐-정보 채팅 친 인원 트래킹
+const usersWhoChatted = new Set(); // #본캐부캐-정보 채팅 친 인원 트래킹
+const messagesByUser = {}; // Stores messages by user in #본캐부캐-정보
 
 // Create a new client instance
 const client = new Client({
@@ -39,27 +40,40 @@ client.commands.set('부검', require('./Commands/whoHasntChatted.js'));
 })();
 
 // 명령어
-client.on("interactionCreate", async (interaction) =>{
-  if (!interaction.isCommand()) return;
+client.once("ready", async () => {
+  console.log(`${client.user.tag} is online and commands have been registered.`);
 
-  try {
-    const command = client.commands.get(interaction.commandName);
-
-    if (command) {
-      await command.run({client, interaction, usersWhoChatted});
-  
-    }
-  } catch (error){
-    console.error("Error handling interaction: ", error);
-    await interaction.reply({ content: "오류", ephemeral: true});
-  }
-}
-);
+  await client.application.commands.set([
+    {
+      name: '부검',
+      description: '부검:#본캐부캐-정보 에 입력하지 않은 인원 찾아내기',
+    },
+    {
+      name: 'resetchattracking',
+      description: '부검을 위한 #본캐부캐-정보 에 남은 정보를 리셋함',
+    },
+    {
+      name: 'checkchatted',
+      description: '채팅 친 유저의 이름 목록 확인',
+    },
+    {
+      name: 'checkmessage',
+      description: '특정 유저가 보낸 메시지 확인',
+      options: [
+        {
+          name: 'userid',
+          type: 'STRING',
+          description: '메시지를 확인할 유저의 ID',
+          required: true,
+        },
+      ],
+    },
+  ]);
 
   // 목요일 오전 9시 타임존
   cron.schedule('0 9 * * 4', async () => {
     try {
-      console.log("Cron job triggered at 23:23 Korea time");
+      console.log("Cron job triggered at 9:00 Korea time");
       const guild = client.guilds.cache.first(); // 길드 전용봇 다른곳에서 쓸 경우 수정
       if (!guild) {
         console.error('Guild not found.');
@@ -90,17 +104,18 @@ client.on("interactionCreate", async (interaction) =>{
   });
 });
 
-
 // #본캐부캐-정보 트래킹
 client.on('messageCreate', async (message) => {
   const targetChannelId = '1233275024811622431'; // #본캐부캐-정보 채널 ID
   console.log(`Received message from ${message.author.tag} in channel ${message.channel.id}`);
   if (message.channel.id === targetChannelId && !message.author.bot) {
     if (message.content.trim()) {
-      if (!usersWhoChatted.has(message.author.id)) {
-        usersWhoChatted.add(message.author.id);
-        console.log(`${message.author.tag} has been added to the set of users who have chatted.`);
+      usersWhoChatted.add(message.author.id); // Add user to the set
+      if (!messagesByUser[message.author.id]) {
+        messagesByUser[message.author.id] = [];
       }
+      messagesByUser[message.author.id].push(message.content.trim()); // Store message
+      console.log(`${message.author.tag} sent a message: "${message.content.trim()}"`);
     }
   }
 });
@@ -112,14 +127,31 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (interaction.commandName === 'resetchattracking') {
       usersWhoChatted.clear();
+      for (const key in messagesByUser) {
+        delete messagesByUser[key];
+      }
       await interaction.reply('The chat tracking for #본캐부캐-정보 has been reset.');
+    } else if (interaction.commandName === 'checkchatted') {
+      const userNames = Array.from(usersWhoChatted).map(userId => {
+        const user = interaction.guild.members.cache.get(userId);
+        return user ? user.user.tag : `Unknown User (${userId})`;
+      });
+      await interaction.reply(`Users who chatted in #본캐부캐-정보:\n${userNames.join("\n")}`);
+    } else if (interaction.commandName === 'checkmessage') {
+      const userId = interaction.options.getString('userid');
+      if (!messagesByUser[userId]) {
+        await interaction.reply(`No messages found for user ID ${userId}.`);
+        return;
+      }
+      const messages = messagesByUser[userId].join("\n");
+      await interaction.reply(`Messages from user ID ${userId}:\n${messages}`);
     } else if (command) {
       await interaction.deferReply();
       await command.run({ client, interaction, usersWhoChatted });
     }
   } catch (error) {
     console.error('Error handling interaction:', error);
-    await interaction.editReply({ content: 'An error occurred.', ephemeral: true });
+    await interaction.reply({ content: 'An error occurred.', ephemeral: true });
   }
 });
 
