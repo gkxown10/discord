@@ -75,15 +75,15 @@ client.once("ready", async () => {
       description: "부검:#본캐부캐-정보 에 입력하지 않은 인원 찾아내기",
     },
     {
-      name: "resetchattracking",
+      name: "리셋트래킹",
       description: "부검을 위한 #본캐부캐-정보 에 남은 정보를 리셋함",
     },
     {
-      name: "checkchatted",
+      name: "채팅친인원",
       description: "채팅 친 유저의 이름 목록 확인",
     },
     {
-      name: "checkmessage",
+      name: "본캐부검",
       description: "특정 유저가 보낸 메시지 확인",
       options: [
         {
@@ -151,15 +151,15 @@ client.on("interactionCreate", async (interaction) => {
   try {
     const { commandName, options } = interaction;
 
-    if (commandName === "resetchattracking") {
+    if (commandName === "리셋트래킹") {
       usersWhoChatted.clear();
-      await interaction.reply("The chat tracking for #본캐부캐-정보 has been reset.");
-    } else if (commandName === "checkchatted") {
+      await interaction.reply("채팅 트래킹리셋");
+    } else if (commandName === "채팅친인원") {
       await interaction.deferReply({ ephemeral: true }); // Acknowledge the interaction
       const userIds = Array.from(usersWhoChatted.keys());
 
       if (userIds.length === 0) {
-        await interaction.editReply("No users have chatted in #본캐부캐-정보 yet.");
+        await interaction.editReply("에러");
         return;
       }
 
@@ -196,7 +196,7 @@ client.on("interactionCreate", async (interaction) => {
       for (const chunk of chunks) {
         await interaction.followUp(chunk);
       }
-    } else if (commandName === "checkmessage") {
+    } else if (commandName === "본캐부검") {
       await interaction.deferReply({ ephemeral: true }); // Acknowledge the interaction
       const userName = options.getString("username");
       const guild = interaction.guild;
