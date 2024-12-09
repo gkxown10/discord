@@ -299,22 +299,41 @@ client.on("messageCreate", async (message) => {
 
 
 
-client.on("messageCreate", async (message) => {
-  // Ignore messages from bots
-  if (message.author.bot) return;
+// Register the /아오 command
+client.once("ready", async () => {
+  console.log(`${client.user.tag} is online and ready!`);
 
-  // Check if the message content includes "아오"
-  if (message.content.includes("아오")) {
+  // Set the /아오 command
+  await client.application.commands.set([
+    {
+      name: "아오",
+      description: "‘구강(九綱)’. ‘편광(偏光)’. ‘까마귀와 성명(聲明)’. ‘표리의 틈새’",
+    },
+    // Add other commands here as needed
+  ]);
+
+  console.log("Slash commands have been registered.");
+});
+
+// Handle slash commands
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isCommand()) return;
+
+  const { commandName } = interaction;
+
+  if (commandName === "아오") {
     try {
-      // Replace these with the actual emoji IDs
+
       const akaEmoji = "<:AKA:1279535972035596331>";
       const murasakiEmoji = "<:MURASAKI:1279535991635574835>";
 
-      // Send the emojis individually
-      await message.channel.send(akaEmoji);
-      await message.channel.send(murasakiEmoji);
+      await interaction.reply(`${akaEmoji} ${murasakiEmoji}`);
     } catch (error) {
-      console.error("에러:", error);
+      console.error("Error while handling /아오 command:", error);
+      await interaction.reply({
+        content: "이모지를 보내는 도중 문제가 발생했습니다.",
+        ephemeral: true,
+      });
     }
   }
 });
