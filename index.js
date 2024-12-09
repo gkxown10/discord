@@ -52,14 +52,29 @@ async function loadPreviousMessages() {
       return;
     }
 
-    const messages = await targetChannel.messages.fetch({ limit: 100 });
-    messages.forEach((message) => {
-      if (!message.author.bot) {
-        usersWhoChatted.set(message.author.id, message.content);
-      }
-    });
+    let lastMessageId = null;
+    let fetchedMessages;
+    let totalFetched = 0;
 
-    console.log("Previous messages loaded from #본캐부캐-정보.");
+    do {
+      fetchedMessages = await targetChannel.messages.fetch({
+        limit: 100,
+        before: lastMessageId,
+      });
+
+      fetchedMessages.forEach((message) => {
+        if (!message.author.bot) {
+          usersWhoChatted.set(message.author.id, message.content);
+        }
+      });
+
+      totalFetched += fetchedMessages.size;
+      console.log(`Fetched ${fetchedMessages.size} messages. Total: ${totalFetched}`);
+
+      lastMessageId = fetchedMessages.size > 0 ? fetchedMessages.last().id : null;
+    } while (fetchedMessages.size > 0);
+
+    console.log("Finished loading previous messages.");
   } catch (error) {
     console.error("Error loading previous messages:", error);
   }
@@ -87,7 +102,7 @@ client.once("ready", async () => {
       description: "특정 유저가 보낸 메시지 확인",
       options: [
         {
-          type: 3, // STRING type
+          type: 3,
           name: "username",
           description: "메시지를 확인할 유저의 이름",
           required: true,
@@ -144,7 +159,7 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-// Handle slash commands
+// Handle slash commands and other interactions
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
 
@@ -155,7 +170,7 @@ client.on("interactionCreate", async (interaction) => {
       await loadPreviousMessages(); // Reload previous messages
       await interaction.reply("채팅 트래킹을 리셋하고 이전 메시지를 다시 로드했습니다.");
     } else if (commandName === "채팅친인원") {
-      await interaction.deferReply({ ephemeral: true }); // Acknowledge the interaction
+      await interaction.deferReply({ ephemeral: true });
       const userIds = Array.from(usersWhoChatted.keys());
 
       if (userIds.length === 0) {
@@ -166,12 +181,11 @@ client.on("interactionCreate", async (interaction) => {
       const guild = interaction.guild;
       const userNames = [];
 
-      // Fetch user details dynamically if not in cache
       for (const userId of userIds) {
         let member = guild.members.cache.get(userId);
         if (!member) {
           try {
-            member = await guild.members.fetch(userId); // Fetch from the server
+            member = await guild.members.fetch(userId);
           } catch {
             userNames.push(`Unknown User (${userId})`);
             continue;
@@ -192,12 +206,11 @@ client.on("interactionCreate", async (interaction) => {
       }
       if (currentChunk) chunks.push(currentChunk);
 
-      // Send chunks
       for (const chunk of chunks) {
         await interaction.followUp(chunk);
       }
     } else if (commandName === "본캐부검") {
-      await interaction.deferReply({ ephemeral: true }); // Acknowledge the interaction
+      await interaction.deferReply({ ephemeral: true });
       const userName = options.getString("username");
       const guild = interaction.guild;
       const member = guild.members.cache.find((m) => m.user.tag === userName);
@@ -217,6 +230,31 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.editReply(
         `Message from ${escapeDiscordFormatting(member.user.tag)}: ${messageContent}`
       );
+    } else if (commandName === "부검") {
+      await interaction.deferReply({ ephemeral: true });
+      const guild = interaction.guild;
+
+      const allMembers = await guild.members.fetch();
+      const membersNotChatted = allMembers.filter(
+        (member) => !usersWhoChatted.has(member.id) && !member.user.bot // Exclude bots
+      );
+
+      const chunks = [];
+      let currentChunk = "";
+
+      for (const member of membersNotChatted.values()) {
+        const userName = escapeDiscordFormatting(member.user.tag);
+        if ((currentChunk + userName + "\n").length > 1900) {
+          chunks.push(currentChunk);
+          currentChunk = "";
+        }
+        currentChunk += `${userName}\n`;
+      }
+      if (currentChunk) chunks.push(currentChunk);
+
+      for (const chunk of chunks) {
+        await interaction.followUp(chunk);
+      }
     }
   } catch (error) {
     console.error("Error handling interaction:", error);
@@ -230,6 +268,57 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
+
+// Reset tracking whenever a message is sent in #본캐부캐-정보
+client.on("messageCreate", async (message) => {
+  const targetChannelName = "본캐부캐-정보"; // The channel to track
+  const logChannelName = "생사부"; // The channel to log resets
+
+  // Ensure the message is in #본캐부캐-정보 and not from a bot
+  if (message.channel.name === targetChannelName && !message.author.bot) {
+    const guild = message.guild;
+    const logChannel = guild.channels.cache.find((ch) => ch.name === logChannelName);
+
+    if (!logChannel) {
+      console.error(`Log channel "${logChannelName}" not found.`);
+      return;
+    }
+
+    // Reset the tracking
+    usersWhoChatted.clear();
+
+    // Notify about the reset in #생사부
+    await logChannel.send("본캐부캐-정보 가 갱신되었습니다");
+
+    // Add the current message to the tracking map
+    usersWhoChatted.set(message.author.id, message.content);
+
+    console.log("Tracking reset and new message recorded.");
+  }
+});
+
+
+
+client.on("messageCreate", async (message) => {
+  // Ignore messages from bots
+  if (message.author.bot) return;
+
+  // Check if the message content includes "아오"
+  if (message.content.includes("아오")) {
+    try {
+      // Replace these with the actual emoji IDs
+      const akaEmoji = "<:AKA:1279535972035596331>";
+      const murasakiEmoji = "<:MURASAKI:1279535991635574835>";
+
+      // Send the emojis individually
+      await message.channel.send(akaEmoji);
+      await message.channel.send(murasakiEmoji);
+    } catch (error) {
+      console.error("에러:", error);
+    }
+  }
+});
+
 
 // Welcome message handler
 client.on("guildMemberAdd", async (member) => {
@@ -253,9 +342,20 @@ client.on("guildMemberAdd", async (member) => {
   }
 });
 
-// Goodbye message handler
-client.on("guildMemberRemove", (member) => {
+// 퇴장메세지
+client.on("guildMemberRemove", async (member) => {
   const channel = member.guild.channels.cache.find((ch) => ch.name === "생사부");
-  if (!channel) return console.error("Channel not found");
-  channel.send(`${member.user.tag} 가 서버에서 퇴장하였습니다.`);
+  if (!channel) {
+    return console.error("채널을 찾을 수 없었습니다.");
+  }
+
+  const messageContent = usersWhoChatted.get(member.user.id);
+
+  if (!messageContent) {
+    channel.send(`${member.user.username} 님이 서버에서 퇴장하였습니다. 이전 채팅 기록이 없습니다.`);
+  } else {
+    channel.send(
+      `${member.user.username} 님이 서버에서 퇴장하였습니다. 이전 채팅 기록: "${messageContent}"`
+    );
+  }
 });
