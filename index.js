@@ -94,6 +94,11 @@ client.once("ready", async () => {
       description: "부검을 위한 #본캐부캐-정보 에 남은 정보를 리셋함",
     },
     {
+      name: "아오",
+      description: "‘구강(九綱)’. ‘편광(偏光)’. ‘까마귀와 성명(聲明)’. ‘표리의 틈새’",
+    },
+
+    {
       name: "채팅친인원",
       description: "채팅 친 유저의 이름 목록 확인",
     },
@@ -209,7 +214,24 @@ client.on("interactionCreate", async (interaction) => {
       for (const chunk of chunks) {
         await interaction.followUp(chunk);
       }
-    } else if (commandName === "본캐부검") {
+    } 
+    else if (commandName === "아오") {
+      try {
+  
+        const akaEmoji = "<:AKA:1279535972035596331>";
+        const murasakiEmoji = "<:MURASAKI:1279535991635574835>";
+  
+        await interaction.reply(`${akaEmoji} ${murasakiEmoji}`);
+      } catch (error) {
+        console.error("Error while handling /아오 command:", error);
+        await interaction.reply({
+          content: "이모지를 보내는 도중 문제가 발생했습니다.",
+          ephemeral: true,
+        });
+      }
+    }
+    
+    else if (commandName === "본캐부검") {
       await interaction.deferReply({ ephemeral: true });
       const userName = options.getString("username");
       const guild = interaction.guild;
@@ -299,44 +321,6 @@ client.on("messageCreate", async (message) => {
 
 
 
-// Register the /아오 command
-client.once("ready", async () => {
-  console.log(`${client.user.tag} is online and ready!`);
-
-  // Set the /아오 command
-  await client.application.commands.set([
-    {
-      name: "아오",
-      description: "‘구강(九綱)’. ‘편광(偏光)’. ‘까마귀와 성명(聲明)’. ‘표리의 틈새’",
-    },
-    // Add other commands here as needed
-  ]);
-
-  console.log("Slash commands have been registered.");
-});
-
-// Handle slash commands
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isCommand()) return;
-
-  const { commandName } = interaction;
-
-  if (commandName === "아오") {
-    try {
-
-      const akaEmoji = "<:AKA:1279535972035596331>";
-      const murasakiEmoji = "<:MURASAKI:1279535991635574835>";
-
-      await interaction.reply(`${akaEmoji} ${murasakiEmoji}`);
-    } catch (error) {
-      console.error("Error while handling /아오 command:", error);
-      await interaction.reply({
-        content: "이모지를 보내는 도중 문제가 발생했습니다.",
-        ephemeral: true,
-      });
-    }
-  }
-});
 
 
 // Welcome message handler
