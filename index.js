@@ -290,6 +290,8 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
+
+
 client.on("messageCreate", async (message) => {
   const targetChannelName = "본캐부캐-정보"; // Channel to track
   const logChannelName = "생사부"; // Channel to log resets
@@ -309,14 +311,35 @@ client.on("messageCreate", async (message) => {
       // Clear the tracking map
       usersWhoChatted.clear();
 
-      // Log reset notification in #생사부
+      // Fetch historical messages from #본캐부캐-정보
+      let lastMessageId = null;
+      let fetchedMessages;
+
+      do {
+        fetchedMessages = await message.channel.messages.fetch({
+          limit: 100,
+          before: lastMessageId, // Fetch messages before the last fetched message
+        });
+
+        fetchedMessages.forEach((msg) => {
+          if (!msg.author.bot) {
+            usersWhoChatted.set(msg.author.id, msg.content); // Store user messages
+          }
+        });
+
+        lastMessageId =
+          fetchedMessages.size > 0 ? fetchedMessages.last().id : null; // Update the last message ID
+      } while (fetchedMessages.size > 0); // Continue until no more messages
+
+      // Notify about the reset in #생사부
       await logChannel.send("본캐부캐-정보 가 갱신되었습니다.");
 
-      // Add the current message to the tracking map
+      // Add the new message to the tracking map
       usersWhoChatted.set(message.author.id, message.content);
 
       // Debugging logs
-      console.log(`Tracking reset. New message added from ${message.author.username}: "${message.content}"`);
+      console.log(`Tracking reset. Loaded ${usersWhoChatted.size} messages.`);
+      console.log(`New message added from ${message.author.username}: "${message.content}"`);
     } catch (error) {
       console.error("Error handling message reset:", error);
     }
