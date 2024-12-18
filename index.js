@@ -290,36 +290,38 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
-
-// Reset tracking whenever a message is sent in #본캐부캐-정보
 client.on("messageCreate", async (message) => {
-  const targetChannelName = "본캐부캐-정보"; // The channel to track
-  const logChannelName = "생사부"; // The channel to log resets
+  const targetChannelName = "본캐부캐-정보"; // Channel to track
+  const logChannelName = "생사부"; // Channel to log resets
 
   // Ensure the message is in #본캐부캐-정보 and not from a bot
   if (message.channel.name === targetChannelName && !message.author.bot) {
-    const guild = message.guild;
-    const logChannel = guild.channels.cache.find((ch) => ch.name === logChannelName);
+    try {
+      const guild = message.guild;
 
-    if (!logChannel) {
-      console.error(`Log channel "${logChannelName}" not found.`);
-      return;
+      // Find the log channel (#생사부)
+      const logChannel = guild.channels.cache.find((ch) => ch.name === logChannelName);
+      if (!logChannel) {
+        console.error(`Log channel "${logChannelName}" not found.`);
+        return;
+      }
+
+      // Clear the tracking map
+      usersWhoChatted.clear();
+
+      // Log reset notification in #생사부
+      await logChannel.send("본캐부캐-정보 가 갱신되었습니다.");
+
+      // Add the current message to the tracking map
+      usersWhoChatted.set(message.author.id, message.content);
+
+      // Debugging logs
+      console.log(`Tracking reset. New message added from ${message.author.username}: "${message.content}"`);
+    } catch (error) {
+      console.error("Error handling message reset:", error);
     }
-
-    // Reset the tracking
-    usersWhoChatted.clear();
-
-    // Notify about the reset in #생사부
-    await logChannel.send("본캐부캐-정보 가 갱신되었습니다");
-
-    // Add the current message to the tracking map
-    usersWhoChatted.set(message.author.id, message.content);
-
-    console.log("Tracking reset and new message recorded.");
   }
 });
-
-
 
 
 
