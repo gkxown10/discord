@@ -64,7 +64,10 @@ async function loadPreviousMessages() {
 
       fetchedMessages.forEach((message) => {
         if (!message.author.bot) {
-          usersWhoChatted.set(message.author.id, message.content);
+          if (!usersWhoChatted.has(message.author.id)) {
+            usersWhoChatted.set(message.author.id, []);
+          }
+          usersWhoChatted.get(message.author.id).push(message.content);
         }
       });
 
@@ -97,10 +100,13 @@ client.once("ready", async () => {
       name: "아오",
       description: "‘구강(九綱)’. ‘편광(偏光)’. ‘까마귀와 성명(聲明)’. ‘표리의 틈새’",
     },
-
     {
       name: "채팅친인원",
       description: "채팅 친 유저의 이름 목록 확인",
+    },
+    {
+      name: "중복",
+      description: "중복 채팅한 유저 확인",
     },
     {
       name: "본캐부검",
@@ -119,47 +125,14 @@ client.once("ready", async () => {
   await loadPreviousMessages();
 });
 
-// Schedule a message for Thursdays at 9:00 AM KST
-cron.schedule(
-  "0 9 * * 4",
-  async () => {
-    try {
-      console.log("Cron job triggered at 9:00 AM KST on Thursday.");
-      const guild = client.guilds.cache.first();
-      if (!guild) {
-        console.error("Guild not found.");
-        return;
-      }
-
-      const targetChannel = guild.channels.cache.get("1230710960465907734"); // 완장관리탭 ID
-      const role = guild.roles.cache.find((r) => r.name === "파란 지우개");
-
-      if (!targetChannel) {
-        console.error("Target channel not found.");
-        return;
-      }
-
-      if (!role) {
-        console.error('Role "파란 지우개" not found.');
-        return;
-      }
-
-      await targetChannel.send(`${role} 수로 안친 길드원들 역할 조정 부탁드립니다.`);
-      console.log("Scheduled message sent to #완장관리탭 for role @파란 지우개.");
-    } catch (error) {
-      console.error("Error during scheduled task:", error);
-    }
-  },
-  {
-    timezone: "Asia/Seoul",
-  }
-);
-
 // Track messages in #본캐부캐-정보
 client.on("messageCreate", async (message) => {
   const targetChannelId = "1233275024811622431"; // #본캐부캐-정보 channel ID
   if (message.channel.id === targetChannelId && !message.author.bot) {
-    usersWhoChatted.set(message.author.id, message.content); // Save the user's message
+    if (!usersWhoChatted.has(message.author.id)) {
+      usersWhoChatted.set(message.author.id, []);
+    }
+    usersWhoChatted.get(message.author.id).push(message.content); // Save the user's message
     console.log(`${message.author.tag} has been added to the tracked users.`);
   }
 });
@@ -171,7 +144,55 @@ client.on("interactionCreate", async (interaction) => {
   try {
     const { commandName, options } = interaction;
 
-    if (commandName === "리셋트래킹") {
+    if (commandName === "중복") {
+      await interaction.deferReply({ ephemeral: true });
+
+      const duplicateUsers = [];
+      usersWhoChatted.forEach((messages, userId) => {
+        if (messages.length > 1) {
+          duplicateUsers.push({ userId, messagesCount: messages.length });
+        }
+      });
+
+      if (duplicateUsers.length === 0) {
+        await interaction.editReply("중복 채팅한 유저가 없습니다.");
+        return;
+      }
+
+      const guild = interaction.guild;
+      const userNames = [];
+
+      for (const { userId, messagesCount } of duplicateUsers) {
+        let member = guild.members.cache.get(userId);
+        if (!member) {
+          try {
+            member = await guild.members.fetch(userId);
+          } catch {
+            userNames.push(`Unknown User (${userId}) - ${messagesCount} messages`);
+            continue;
+          }
+        }
+        userNames.push(`${escapeDiscordFormatting(member.user.tag)} - ${messagesCount} messages`);
+      }
+
+      const chunks = [];
+      let currentChunk = "";
+
+      for (const userName of userNames) {
+        if ((currentChunk + userName + "\n").length > 1900) {
+          chunks.push(currentChunk);
+          currentChunk = "";
+        }
+        currentChunk += `${userName}\n`;
+      }
+      if (currentChunk) chunks.push(currentChunk);
+
+      for (const chunk of chunks) {
+        await interaction.followUp(chunk);
+      }
+    }
+
+    else if (commandName === "리셋트래킹") {
       await loadPreviousMessages(); // Reload previous messages
       await interaction.reply("채팅 트래킹을 리셋하고 이전 메시지를 다시 로드했습니다.");
     } else if (commandName === "채팅친인원") {
@@ -215,6 +236,7 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.followUp(chunk);
       }
     } 
+
     else if (commandName === "아오") {
       try {
   
@@ -230,6 +252,7 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
     }
+    
     
     else if (commandName === "본캐부검") {
       await interaction.deferReply({ ephemeral: true });
@@ -252,7 +275,9 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.editReply(
         `Message from ${escapeDiscordFormatting(member.user.tag)}: ${messageContent}`
       );
-    } else if (commandName === "부검") {
+    } 
+    
+    else if (commandName === "부검") {
       await interaction.deferReply({ ephemeral: true });
       const guild = interaction.guild;
 
@@ -278,6 +303,8 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.followUp(chunk);
       }
     }
+
+
   } catch (error) {
     console.error("Error handling interaction:", error);
     try {
@@ -290,63 +317,6 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
-
-
-client.on("messageCreate", async (message) => {
-  const targetChannelName = "본캐부캐-정보"; // Channel to track
-  const logChannelName = "생사부"; // Channel to log resets
-
-  // Ensure the message is in #본캐부캐-정보 and not from a bot
-  if (message.channel.name === targetChannelName && !message.author.bot) {
-    try {
-      const guild = message.guild;
-
-      // Find the log channel (#생사부)
-      const logChannel = guild.channels.cache.find((ch) => ch.name === logChannelName);
-      if (!logChannel) {
-        console.error(`Log channel "${logChannelName}" not found.`);
-        return;
-      }
-
-      // Clear the tracking map
-      usersWhoChatted.clear();
-
-      // Fetch historical messages from #본캐부캐-정보
-      let lastMessageId = null;
-      let fetchedMessages;
-
-      do {
-        fetchedMessages = await message.channel.messages.fetch({
-          limit: 100,
-          before: lastMessageId, // Fetch messages before the last fetched message
-        });
-
-        fetchedMessages.forEach((msg) => {
-          if (!msg.author.bot) {
-            usersWhoChatted.set(msg.author.id, msg.content); // Store user messages
-          }
-        });
-
-        lastMessageId =
-          fetchedMessages.size > 0 ? fetchedMessages.last().id : null; // Update the last message ID
-      } while (fetchedMessages.size > 0); // Continue until no more messages
-
-      // Notify about the reset in #생사부
-      await logChannel.send("본캐부캐-정보 가 갱신되었습니다.");
-
-      // Add the new message to the tracking map
-      usersWhoChatted.set(message.author.id, message.content);
-
-      // Debugging logs
-      console.log(`Tracking reset. Loaded ${usersWhoChatted.size} messages.`);
-      console.log(`New message added from ${message.author.username}: "${message.content}"`);
-    } catch (error) {
-      console.error("Error handling message reset:", error);
-    }
-  }
-});
-
-
 
 // Welcome message handler
 client.on("guildMemberAdd", async (member) => {
@@ -370,7 +340,7 @@ client.on("guildMemberAdd", async (member) => {
   }
 });
 
-// 퇴장메세지
+// Guild member leave handler
 client.on("guildMemberRemove", async (member) => {
   const channel = member.guild.channels.cache.find((ch) => ch.name === "생사부");
   if (!channel) {
