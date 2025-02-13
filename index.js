@@ -20,7 +20,7 @@ client.commands = new Collection();
 
 // Utility function to escape Discord formatting
 function escapeDiscordFormatting(text) {
-  return text.replace(/[*_~|]/g, "\\$&");
+  return text.replace(/[*_~`|]/g, "\\$&");
 }
 
 // Main async function to connect to MongoDB and start the bot
@@ -36,7 +36,7 @@ function escapeDiscordFormatting(text) {
     // Log in to Discord using your bot's token
     client.login(process.env.TOKEN);
   } catch (error) {
-    console.log(Error connecting to DB: ${error});
+    console.log(`Error connecting to DB: ${error}`);
   }
 })();
 
@@ -69,7 +69,7 @@ async function loadPreviousMessages() {
       });
 
       totalFetched += fetchedMessages.size;
-      console.log(Fetched ${fetchedMessages.size} messages. Total: ${totalFetched});
+      console.log(`Fetched ${fetchedMessages.size} messages. Total: ${totalFetched}`);
 
       lastMessageId = fetchedMessages.size > 0 ? fetchedMessages.last().id : null;
     } while (fetchedMessages.size > 0);
@@ -82,7 +82,7 @@ async function loadPreviousMessages() {
 
 // Command setup and cron job registration
 client.once("ready", async () => {
-  console.log(${client.user.tag} is online and commands have been registered.);
+  console.log(`${client.user.tag} is online and commands have been registered.`);
 
   await client.application.commands.set([
     {
@@ -102,12 +102,6 @@ client.once("ready", async () => {
       name: "채팅친인원",
       description: "채팅 친 유저의 이름 목록 확인",
     },
-    
-    {
-      name: "중복",
-      description: "중복",
-    },
-
     {
       name: "본캐부검",
       description: "특정 유저가 보낸 메시지 확인",
@@ -150,7 +144,7 @@ cron.schedule(
         return;
       }
 
-      await targetChannel.send(${role} 수로 안친 길드원들 역할 조정 부탁드립니다.);
+      await targetChannel.send(`${role} 수로 안친 길드원들 역할 조정 부탁드립니다.`);
       console.log("Scheduled message sent to #완장관리탭 for role @파란 지우개.");
     } catch (error) {
       console.error("Error during scheduled task:", error);
@@ -166,7 +160,7 @@ client.on("messageCreate", async (message) => {
   const targetChannelId = "1233275024811622431"; // #본캐부캐-정보 channel ID
   if (message.channel.id === targetChannelId && !message.author.bot) {
     usersWhoChatted.set(message.author.id, message.content); // Save the user's message
-    console.log(${message.author.tag} has been added to the tracked users.);
+    console.log(`${message.author.tag} has been added to the tracked users.`);
   }
 });
 
@@ -198,7 +192,7 @@ client.on("interactionCreate", async (interaction) => {
           try {
             member = await guild.members.fetch(userId);
           } catch {
-            userNames.push(Unknown User (${userId}));
+            userNames.push(`Unknown User (${userId})`);
             continue;
           }
         }
@@ -213,7 +207,7 @@ client.on("interactionCreate", async (interaction) => {
           chunks.push(currentChunk);
           currentChunk = "";
         }
-        currentChunk += ${userName}\n;
+        currentChunk += `${userName}\n`;
       }
       if (currentChunk) chunks.push(currentChunk);
 
@@ -221,14 +215,13 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.followUp(chunk);
       }
     } 
-
     else if (commandName === "아오") {
       try {
   
         const akaEmoji = "<:AKA:1279535972035596331>";
         const murasakiEmoji = "<:MURASAKI:1279535991635574835>";
   
-        await interaction.reply(${akaEmoji} ${murasakiEmoji});
+        await interaction.reply(`${akaEmoji} ${murasakiEmoji}`);
       } catch (error) {
         console.error("Error while handling /아오 command:", error);
         await interaction.reply({
@@ -238,7 +231,6 @@ client.on("interactionCreate", async (interaction) => {
       }
     }
     
-    
     else if (commandName === "본캐부검") {
       await interaction.deferReply({ ephemeral: true });
       const userName = options.getString("username");
@@ -246,23 +238,21 @@ client.on("interactionCreate", async (interaction) => {
       const member = guild.members.cache.find((m) => m.user.tag === userName);
 
       if (!member) {
-        await interaction.editReply(${userName}의 채팅을 찾지 못했습니다.);
+        await interaction.editReply(`${userName}의 채팅을 찾지 못했습니다.`);
         return;
       }
 
       const messageContent = usersWhoChatted.get(member.user.id);
 
       if (!messageContent) {
-        await interaction.editReply(${userName}의 채팅을 찾지 못했습니다.);
+        await interaction.editReply(`${userName}의 채팅을 찾지 못했습니다.`);
         return;
       }
 
       await interaction.editReply(
-        Message from ${escapeDiscordFormatting(member.user.tag)}: ${messageContent}
+        `Message from ${escapeDiscordFormatting(member.user.tag)}: ${messageContent}`
       );
-    } 
-    
-    else if (commandName === "부검") {
+    } else if (commandName === "부검") {
       await interaction.deferReply({ ephemeral: true });
       const guild = interaction.guild;
 
@@ -280,7 +270,7 @@ client.on("interactionCreate", async (interaction) => {
           chunks.push(currentChunk);
           currentChunk = "";
         }
-        currentChunk += ${userName}\n;
+        currentChunk += `${userName}\n`;
       }
       if (currentChunk) chunks.push(currentChunk);
 
@@ -314,7 +304,7 @@ client.on("messageCreate", async (message) => {
       // Find the log channel (#생사부)
       const logChannel = guild.channels.cache.find((ch) => ch.name === logChannelName);
       if (!logChannel) {
-        console.error(Log channel "${logChannelName}" not found.);
+        console.error(`Log channel "${logChannelName}" not found.`);
         return;
       }
 
@@ -348,8 +338,8 @@ client.on("messageCreate", async (message) => {
       usersWhoChatted.set(message.author.id, message.content);
 
       // Debugging logs
-      console.log(Tracking reset. Loaded ${usersWhoChatted.size} messages.);
-      console.log(New message added from ${message.author.username}: "${message.content}");
+      console.log(`Tracking reset. Loaded ${usersWhoChatted.size} messages.`);
+      console.log(`New message added from ${message.author.username}: "${message.content}"`);
     } catch (error) {
       console.error("Error handling message reset:", error);
     }
@@ -363,7 +353,7 @@ client.on("guildMemberAdd", async (member) => {
   const targetChannelId = "1229948971406069772"; // #일반채팅 ID
   const welcomeChannel = member.guild.channels.cache.get(targetChannelId);
   if (welcomeChannel) {
-    const welcomeMessage = 
+    const welcomeMessage = `
       안녕하세요, <@${member.id}>! 환영합니다!
       
       <#1233275024811622431> 여기에 본부캐 정보 입력
@@ -374,9 +364,9 @@ client.on("guildMemberAdd", async (member) => {
       
       문제가 생길 경우 <#1269814459111571548>에서 티켓 누른 뒤 문의하시면 됩니다.
       골럭스 버스 필요하면 <#1232158295104553080>에서 운영하고 있으니 참여해주세요!
-    ;
+    `;
     await welcomeChannel.send(welcomeMessage);
-    console.log(Welcome message sent to ${member.user.tag});
+    console.log(`Welcome message sent to ${member.user.tag}`);
   }
 });
 
@@ -390,10 +380,10 @@ client.on("guildMemberRemove", async (member) => {
   const messageContent = usersWhoChatted.get(member.user.id);
 
   if (!messageContent) {
-    channel.send(${member.user.username} 님이 서버에서 퇴장하였습니다. 이전 채팅 기록이 없습니다.);
+    channel.send(`${member.user.username} 님이 서버에서 퇴장하였습니다. 이전 채팅 기록이 없습니다.`);
   } else {
     channel.send(
-      ${member.user.username} 님이 서버에서 퇴장하였습니다. 이전 채팅 기록: "${messageContent}"
+      `${member.user.username} 님이 서버에서 퇴장하였습니다. 이전 채팅 기록: "${messageContent}"`
     );
   }
 });
